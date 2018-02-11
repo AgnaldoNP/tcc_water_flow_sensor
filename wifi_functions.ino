@@ -64,9 +64,9 @@ boolean isConfigured() {
 }
 
 void collectData() {
-  if(isWifiConnected) {
-    Serial.println("\nCollecting data and WebService Loging ...");
+  if(isWifiConnected) {    
     if(logsList.size() >0) {
+      Serial.println("\nCollecting data and WebService Loging ...");
         DynamicJsonBuffer jsonBuffer;
         JsonArray& rootArray = jsonBuffer.createArray();
         int i, logSize = logsList.size();
@@ -102,8 +102,6 @@ void collectData() {
             }
         }
 
-    } else {
-        Serial.println("No log to send to WebService!");
     }
   } else {
     Serial.println("No wifi connected!");
