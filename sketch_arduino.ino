@@ -1,13 +1,4 @@
-/*links reference:
- QList - https://github.com/SloCompTech/QList
- ESP8266WiFi - http://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/readme.html
- ESP8266WiFiAP - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFiAP.h
- ESP8266WebServer - https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WebServer/src/ESP8266WebServer.h
- RestClient - https://github.com/DaKaZ/esp8266-restclient
- ArduinoJson - https://bblanchon.github.io/ArduinoJson/doc/encoding/
- EEPROM - http://pedrominatel.com.br/pt/esp8266/utilizando-eeprom-do-esp8266/
-          https://circuits4you.com/2016/12/16/esp8266-internal-eeprom-arduino/
-*/
+
 
 #include <ESP8266WiFi.h>
 #include <QList.h>
@@ -43,50 +34,43 @@ QList<LogObject> logsList;
 const int setupPin = D0;
 
 ///////vaiables for water flow sensor/////////////////
-byte sensorInterrupt = 0;  // 0 = digital pin D4
-byte sensorPin       = D4;
+byte sensorPin       = 13; //pin D7
 
-// The hall-effect flow sensor outputs approximately 4.5 pulses per second per
-// litre/minute of flow.
-float calibrationFactor = 4.5;
-
-volatile byte pulseCount;  
+unsigned long pulseCount;  
 
 float flowRate;
+float media;
 unsigned int flowMilliLitres;
 unsigned long totalMilliLitres;
 
+unsigned long secondsFlow;
 unsigned long oldTime;
 /////////////////////////////////////////////////////
 
-
+void pulseCounter() {
+  pulseCount++;
+}
 
 void setup() {
-    pinMode(setupPin, INPUT);
-
     Serial.begin(115200);
-    Serial.println();
-
-    readWiFiConfigurations();
-
+    pinMode(BUILTIN_LED, OUTPUT);
+    pinMode(setupPin, INPUT);
     pinMode(sensorPin, INPUT);
-    digitalWrite(sensorPin, HIGH);
-    
+    attachInterrupt(sensorPin, pulseCounter, RISING);
+
     pulseCount        = 0;
     flowRate          = 0.0;
     flowMilliLitres   = 0;
     totalMilliLitres  = 0;
     oldTime           = 0;
-    
-    // The Hall-effect sensor is connected to pin D4 which uses interrupt 0.
-    // Configured to trigger on a FALLING state change (transition from HIGH
-    // state to LOW state)
-    attachInterrupt(sensorInterrupt, pulseCounter, FALLING);
+    secondsFlow       = 0;
+
+    pulseCounter();
+    readWiFiConfigurations();
 }
 
 void loop() {
-
-    //Modo de configuração
+  //Modo de configuração
     if(digitalRead(setupPin)) {
         disconnectWifi();
         startSoftAP();
@@ -101,64 +85,38 @@ void loop() {
    logInformations();
 }
 
-
 void logInformations() {
-  if((millis() - oldTime) > 1000){   // Only process counters once per second
-    // Disable the interrupt while calculating flow rate and sending the value to
-    // the host
-    detachInterrupt(sensorInterrupt);
+  
+  if((millis() - oldTime) > 1000){   // Only process counters once per seconds
+    cli();      //Desabilita interrupção
+    Serial.println(pulseCount);
+     
+    flowRate = pulseCount / (float)5.5; //Converte para L/min
+    media=media+flowRate; //Soma a vazão para o calculo da media
+    totalMilliLitres += flowRate; //Vazão total
+    secondsFlow++;
     
-    // Because this loop may not complete in exactly 1 second intervals we calculate
-    // the number of milliseconds that have passed since the last execution and use
-    // that to scale the output. We also apply the calibrationFactor to scale the output
-    // based on the number of pulses per second per units of measure (litres/minute in
-    // this case) coming from the sensor.
-    flowRate = ((1000.0 / (millis() - oldTime)) * pulseCount) / calibrationFactor;
+    Serial.print(flowRate); //Imprime na serial o valor da vazão
+    Serial.print(" L/min - "); //Imprime L/min
+    Serial.print(secondsFlow); //Imprime a contagem (segundos)
+    Serial.println("s"); //Imprime s indicando que está em segundos
+    
+    if(secondsFlow%60 ==0)
+    {
+      media = media/60; //Tira a media dividindo por 60
+      Serial.print("\nMedia por minuto = "); //Imprime a frase Media por minuto =
+      Serial.print(media); //Imprime o valor da media
+      Serial.println(" L/min - "); //Imprime L/min
+      media = 0; //Zera a variável media para uma nova contagem
+      secondsFlow=0; //Zera a variável i para uma nova contagem
+      Serial.println("\n\nInicio\n\n"); //Imprime Inicio indicando que a contagem iniciou
+    }
 
+    pulseCount = 0;   //Zera a variável para contar os giros por segundos 
     oldTime = millis();
-    
-    // Divide the flow rate in litres/minute by 60 to determine how many litres have
-    // passed through the sensor in this 1 second interval, then multiply by 1000 to
-    // convert to millilitres.
-    flowMilliLitres = (flowRate / 60) * 1000;
-    
-    // Add the millilitres passed in this second to the cumulative total
-    totalMilliLitres += flowMilliLitres;
-    
-    unsigned int frac;
-    
-    // Print the flow rate for this second in litres / minute
-    Serial.print("Flow rate: ");
-    Serial.print(int(flowRate));  // Print the integer part of the variable
-    Serial.print(".");             // Print the decimal point
-    // Determine the fractional part. The 10 multiplier gives us 1 decimal place.
-    frac = (flowRate - int(flowRate)) * 10;
-    Serial.print(frac, DEC) ;      // Print the fractional part of the variable
-    Serial.print("L/min");
-    // Print the number of litres flowed in this second
-    Serial.print("  Current Liquid Flowing: ");             // Output separator
-    Serial.print(flowMilliLitres);
-    Serial.print("mL/Sec");
-    
-    // Print the cumulative total of litres flowed since starting
-    Serial.print("  Output Liquid Quantity: ");             // Output separator
-    Serial.print(totalMilliLitres);
-    Serial.println("mL"); 
-    
-    // Reset the pulse counter so we can start incrementing again
-    pulseCount = 0;
-    
-    // Enable the interrupt again now that we've finished sending output
-    attachInterrupt(sensorInterrupt, pulseCounter, FALLING);
   }
+
+   sei();      //Habilita interrupção
 }
-
-
-void pulseCounter(){
-  pulseCount++;
-}
-
-
-
 
 
