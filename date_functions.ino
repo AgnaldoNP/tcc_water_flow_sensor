@@ -1,9 +1,7 @@
 /*links reference:
  RestClient - https://github.com/DaKaZ/esp8266-restclient
 */
-
 #include "RestClient.h"
-
 
 
 long lastDateSyncronized = 0;
@@ -11,9 +9,10 @@ long millisOnDateSyncronized = 0;
 
 void synchronizeDateTime() {
     Serial.println("\nDate Syncronizing ... ");
-    RestClient client = RestClient("www.tecnolapis.com", 80);
+    
     while(lastDateSyncronized == 0) {
         String response = "";
+        RestClient client = RestClient("www.tecnolapis.com", 80);
         int statusCode = client.get("/projetos/WaterSpentReport/time.php", &response);
         Serial.printf("Request Time Status: %d\n", statusCode);
         Serial.printf("Request Response: ");
@@ -29,7 +28,7 @@ void synchronizeDateTime() {
             response = response.substring(0, response.length()-4);
             Serial.println(response);
             lastDateSyncronized = atol(const_cast<char*>(response.c_str()));
-            millisOnDateSyncronized = millis();
+            millisOnDateSyncronized = millis()/1000;
 
             Serial.print("Time converted: ");
             Serial.println(lastDateSyncronized);
@@ -45,8 +44,8 @@ void synchronizeDateTime() {
 }
 
 long getDateMillis() {
-    long millisNow = millis();
-    long millisDiff = millisNow - millisNow;
+    long millisNow = millis()/1000;
+    long millisDiff = millisNow - millisOnDateSyncronized;
     long dateMilis = lastDateSyncronized + millisDiff;
     return dateMilis;
 }

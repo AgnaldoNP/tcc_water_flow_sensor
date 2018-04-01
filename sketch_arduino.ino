@@ -4,6 +4,9 @@
 #include <QList.h>
 #include "QList.cpp"
 
+
+#define HTTP_DEBUG
+
 //global shared variables
 const int STATUS_OK = 200;
 const int STATUS_CREATED = 201;
@@ -12,6 +15,7 @@ String configSsid;
 String configPassword;
 String configIdentifier;
 //end of global shared variables
+
 
 class LogObject {
 public:
@@ -29,7 +33,7 @@ public:
         average = a;
     }
 };
-QList<LogObject> logsList;
+QList<LogObject*> logsList = QList<LogObject*>();
 
 const int setupPin = D0;
 
@@ -45,6 +49,7 @@ unsigned long totalMilliLitres;
 
 unsigned long secondsFlow;
 unsigned long oldTime;
+unsigned long oldTimeCollect;
 /////////////////////////////////////////////////////
 
 void pulseCounter() {
@@ -64,6 +69,7 @@ void setup() {
     totalMilliLitres  = 0;
     oldTime           = 0;
     secondsFlow       = 0;
+    oldTimeCollect = millis();
 
     pulseCounter();
     readWiFiConfigurations();
@@ -100,10 +106,16 @@ void logInformations() {
     Serial.print(" L/min - "); //Imprime L/min
     Serial.print(secondsFlow); //Imprime a contagem (segundos)
     Serial.println("s"); //Imprime s indicando que está em segundos
+
+    if(flowRate/60 >= 0.01){
+      long now = getDateMillis();
+      LogObject *logObject = new LogObject(configIdentifier, now-1, now, flowRate/60, flowRate);
+      logsList.push_front(logObject);
+    }
     
     if(secondsFlow%60 ==0)
     {
-      media = media/60; //Tira a media dividindo por 60
+      media = totalMilliLitres/60; //Tira a media dividindo por 60
       Serial.print("\nMedia por minuto = "); //Imprime a frase Media por minuto =
       Serial.print(media); //Imprime o valor da media
       Serial.println(" L/min - "); //Imprime L/min

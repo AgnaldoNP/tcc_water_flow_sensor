@@ -1,12 +1,10 @@
 /*links reference:
  ESP8266WiFi - http://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/readme.html
  QList - https://github.com/SloCompTech/QList
- ArduinoJson - https://bblanchon.github.io/ArduinoJson/doc/encoding/
 */
 
-#include <ArduinoJson.h>
 #include <WiFiClient.h>
-#include "RestClient.h"
+#include <ESP8266HTTPClient.h>
 
 boolean isWifiConnected = false;
 
@@ -31,6 +29,7 @@ void connectToWiFi() {
     if(!isWifiConnected) {
         Serial.printf("\nConnecting to WiFi %s - %s ...", const_cast<char*>(configSsid.c_str()), const_cast<char*>(configPassword.c_str()));
         if(isConfigured()) {
+          
             WiFi.begin(const_cast<char*>(configSsid.c_str()), const_cast<char*>(configPassword.c_str()));
             while (WiFi.status() != WL_CONNECTED && !digitalRead(setupPin)) {
                 delay(500);
@@ -64,47 +63,53 @@ boolean isConfigured() {
 }
 
 void collectData() {
-  if(isWifiConnected) {    
-    if(logsList.size() >0) {
-      Serial.println("\nCollecting data and WebService Loging ...");
-        DynamicJsonBuffer jsonBuffer;
-        JsonArray& rootArray = jsonBuffer.createArray();
+  if((millis() - oldTimeCollect) > 30000){
+    oldTimeCollect = millis();
+    
+    if(isWifiConnected) {    
+      if(logsList.size() > 0) {
+        String json = "[";
         int i, logSize = logsList.size();
         for(i=0; i<logSize; i++) {
-            LogObject logObject = logsList.at(i);
-
-            JsonObject& logObjectJson = jsonBuffer.createObject();
-            logObjectJson["startDate"] = logObject.startDate;
-            logObjectJson["endDate"] = logObject.endDate;
-            logObjectJson["spent"] = logObject.spent;
-            logObjectJson["average"] = logObject.average;
-            logObjectJson["identifier"] = logObject.identifier;
-
-            rootArray.add(logObjectJson);
+           LogObject *logObject = logsList.at(i);
+           json += "{\"startDate\": \"" + String(logObject->startDate) +"000\", ";
+           json +="\"endDate\": \"" + String(logObject->endDate) +"000\", ";
+           json +="\"spent\": \"" + String(logObject->spent) +"\", ";
+           json +="\"average\": \"" + String(logObject->average) +"\", ";
+           json +="\"identifier\": \"" + logObject->identifier +"\"}";
+  
+           if(i < logSize-1){
+            json +=",";
+           }
         }
-
-        String json = "";
-        rootArray.printTo(json);
+  
+        json += "]";
+        Serial.println(json);
+        
+        Serial.println("\nCollecting data and WebService Loging ...");
         Serial.println("logJson: "+json);
 
-        delete(&jsonBuffer);
-
         String response = "";
-        char jsonBody[json.length() + 1];
-        json.toCharArray(jsonBody, json.length());
-        RestClient client = RestClient("tecnolapis.com", 443, 1);
-        int statusCode = client.post("/projetos/WaterSpentReport/log.php", jsonBody, &response);
-        Serial.printf("Request CollectData Status: %d, \nRequest CollectData Response: %s\n", statusCode, &response);
+        HTTPClient http;
+        http.begin("http://tecnolapis.com/projetos/WaterSpentReport/log.php");
+        http.addHeader("Content-Type", "application/json");
+        int statusCode = http.POST(json);
+        response =http.getString();
+        http.end();
+  
+        Serial.println("StatusCode: "+String(statusCode)+"  Response Request> "+response);
         if(statusCode == STATUS_OK || statusCode == STATUS_CREATED) {
             //remove items from list
             for(i=0; i<logSize; i++) {
                 logsList.clear(i);
             }
         }
-
+        
+  
+      }
+    } else {
+      Serial.println("No wifi connected!");
     }
-  } else {
-    Serial.println("No wifi connected!");
   }
 }
 
