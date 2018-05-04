@@ -28,22 +28,29 @@ void readWiFiConfigurations() {
 void connectToWiFi() {
     if(!isWifiConnected) {
         Serial.printf("\nConnecting to WiFi %s - %s ...", const_cast<char*>(configSsid.c_str()), const_cast<char*>(configPassword.c_str()));
+        printOnDisplay(0, "Connecting to WiFi");
+        printOnDisplay(1, ".");
         if(isConfigured()) {
           
             WiFi.begin(const_cast<char*>(configSsid.c_str()), const_cast<char*>(configPassword.c_str()));
             while (WiFi.status() != WL_CONNECTED && !digitalRead(setupPin)) {
                 delay(500);
                 Serial.print(".");
+                appendOnDisplay(".");
+                printOnDisplay(0, "Connecting to WiFi");
             }
             if(WiFi.status() == WL_CONNECTED) {
                 Serial.println("");
                 Serial.println("WiFi connected");
+                printOnDisplay(2, "WiFi connected");
                 isWifiConnected = true;
+                clearDisplay();
 
                 synchronizeDateTime();
             }
         } else {
             Serial.println("Wrong Wifi Config.");
+            printOnDisplay(2, "Wrong Wifi Config.");
             isWifiConnected = false;
         }
     }
