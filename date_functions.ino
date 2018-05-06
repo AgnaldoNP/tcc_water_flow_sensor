@@ -37,7 +37,7 @@ void synchronizeDateTime() {
             break;
         }
 
-        if(!digitalRead(setupPin)){
+        if(!inSetupMode){
            // break;
         }
     }

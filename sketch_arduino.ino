@@ -41,7 +41,7 @@ class LogObject {
 };
 QList<LogObject*> logsList = QList<LogObject*>();
 
-const int setupPin = D0;
+const int setupPin = D3;
 
 ///////vaiables for water flow sensor/////////////////
 byte sensorPin       = 13; //pin D7
@@ -57,6 +57,10 @@ unsigned long secondsFlow;
 unsigned long oldTime;
 unsigned long oldTimeCollect;
 /////////////////////////////////////////////////////
+
+byte oldSwitchState = HIGH;
+bool inSetupMode =  false;
+float oldTimeCheckSetupMode;
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
@@ -74,7 +78,7 @@ void setup() {
   printOnDisplay(0, "Setup ...");
 
   pinMode(BUILTIN_LED, OUTPUT);
-  pinMode(setupPin, INPUT);
+  pinMode(setupPin, INPUT_PULLUP);
   pinMode(sensorPin, INPUT);
   attachInterrupt(sensorPin, pulseCounter, RISING);
 
@@ -84,6 +88,7 @@ void setup() {
   totalMilliLitres  = 0;
   oldTime           = 0;
   secondsFlow       = 0;
+  oldTimeCheckSetupMode = 0;
   oldTimeCollect = millis();
 
   pulseCounter();
@@ -93,9 +98,23 @@ void setup() {
   clearDisplay();
 }
 
+bool checkSetupMode() {
+  byte switchState = digitalRead (setupPin);
+  if ((millis() - oldTimeCheckSetupMode) > 50 && switchState != oldSwitchState) {
+    oldSwitchState =  switchState;
+    if (switchState == HIGH) {
+      inSetupMode = !inSetupMode;
+      oldTimeCheckSetupMode = millis();
+      Serial.println(inSetupMode ? "inSetupMode: true" : "inSetupMode: false");
+    }
+  }
+}
+
 void loop() {
+  checkSetupMode();
+
   //Modo de configuração
-  if (digitalRead(setupPin)) {
+  if (inSetupMode) {
     disconnectWifi();
     startSoftAP();
     startConfigServer();
@@ -105,6 +124,7 @@ void loop() {
     connectToWiFi();
     collectData();
   }
+
 
   logInformations();
 }
@@ -124,11 +144,13 @@ void logInformations() {
     Serial.print(" L/min - "); //Imprime L/min
     Serial.print(secondsFlow); //Imprime a contagem (segundos)
     Serial.println("s"); //Imprime s indicando que está em segundos
-
-    clearDisplay();
-    printOnDisplay(0, String(flowRate)+" L/Min");
-    printOnDisplay(1, String(flowRate/60)+" L/Sec");
-    printOnDisplay(2, String(totalMilliLitres)+" Spent (ml)");
+    
+    if (wifiConnected()) {
+      clearDisplay();
+      printOnDisplay(0, String(flowRate) + " L/Min");
+      printOnDisplay(1, String(flowRate / 60) + " L/Sec");
+      printOnDisplay(2, String(totalMilliLitres) + " Spent (ml)");
+    }
 
     if (flowRate / 60 >= 0.01) {
       long now = getDateMillis();

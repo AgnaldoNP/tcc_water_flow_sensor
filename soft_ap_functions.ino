@@ -8,15 +8,16 @@ IPAddress ap_local_IP(192, 168, 1, 1);
 IPAddress ap_gateway(192, 168, 1, 255);
 IPAddress ap_subnet(255, 255, 255, 0);
 
-const char *ap_ssid = "ESP8266WIFI_SoftAP";
+const char *ap_ssid = "ESP8266WIFI_AP";
 const char *ap_pass = "12345678";
 
-boolean softApModeStarted = false;
+boolean softApModeStarted = true;
 int stationsConnected = 0;
 
 void startSoftAP() {
   if (!softApModeStarted) {
     //Serial.print("\n\nSetting Soft-AP Config ... ");
+    clearDisplay();
     printOnDisplay(0, "Starting Soft-AP ...");
     boolean softApConfigResult = WiFi.softAPConfig(ap_local_IP, ap_gateway, ap_subnet);
     //boolean softApConfigResult=  true;
@@ -25,20 +26,20 @@ void startSoftAP() {
       boolean softApResult = WiFi.softAP(ap_ssid, ap_pass);
 
       if (softApResult) {
-        Serial.println("Soft-AP create Ready");
+        //Serial.println("Soft-AP create Ready");
         printOnDisplay(1, "Soft-AP Started");
 
         IPAddress myIP = WiFi.softAPIP();
-        Serial.print("AP IP address: ");
-        Serial.println(myIP);
+        //Serial.print("AP IP address: ");
+        //Serial.println(myIP);
 
-        printOnDisplay(2, "Wi-Fi: " + *ap_ssid);
-        printOnDisplay(3, "Pass: " + *ap_pass);
-        printOnDisplay(4, "IP: " + myIP);
+        printOnDisplay(2, "Wi-Fi: " + String(ap_ssid));
+        printOnDisplay(3, "Pass: " + String(ap_pass));
+        printOnDisplay(4, "IP: " + IPAddressToString(myIP));
         softApModeStarted = true;
 
         stationsConnected = WiFi.softAPgetStationNum();
-        Serial.printf("Stations connected = %d\n", stationsConnected);
+        //Serial.printf("Stations connected = %d\n", stationsConnected);
 
       } else {
         //Serial.println("Failed!");
@@ -55,14 +56,26 @@ void startSoftAP() {
 
   if (stationsConnected != WiFi.softAPgetStationNum()) {
     stationsConnected = WiFi.softAPgetStationNum();
-    Serial.printf("Stations connected = %d\n", stationsConnected);
+    //Serial.printf("Stations connected = %d\n", stationsConnected);
   }
+}
+
+String IPAddressToString(IPAddress ipAddress) {
+  static char szRet[20];
+  String str = String(ipAddress[0]);
+  str += ".";
+  str += String(ipAddress[1]);
+  str += ".";
+  str += String(ipAddress[2]);
+  str += ".";
+  str += String(ipAddress[3]);
+  return str;
 }
 
 void disconnectSofAp() {
   if (softApModeStarted) {
     WiFi.softAPdisconnect(true);
     softApModeStarted = false;
-    Serial.print("\nSoft-AP disconnected\n");
+    //Serial.print("\nSoft-AP disconnected\n");
   }
 }
